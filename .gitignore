@@ -1,0 +1,28 @@
+# 1. 规避所有权重与模型文件
+*.pth
+*.pt
+*.safetensors
+*.bin
+
+# 2. 规避数据集文件夹
+VOCdevkit-3.2/
+VOCdevkit*/
+
+# 3. 规避训练过程生成的日志与实验权重目录
+run/
+result/
+runs/
+logs/
+
+# 4. 规避 Python 与 IDE 缓存
+__pycache__/
+*.pyc
+.idea/
+.vscode/
+
+# 5. 补充规避各类测试与结果文件夹
+result*/
+test*/
+weights/
+img/
+EOF
