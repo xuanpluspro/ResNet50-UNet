@@ -42,13 +42,15 @@ def create_model(num_classes, weights):
         model.load_state_dict(model_dict)
     return model
 
-def get_optimizer_and_lr(model, batch_size, train_epoch, momentum, weight_decay):
-    Init_lr = 1e-4
+def get_optimizer_and_lr(model, batch_size, train_epoch, momentum, weight_decay, lr=1e-4):
+    if not 0 < lr < float('inf'):
+        raise ValueError('--lr must be finite and greater than zero')
+    Init_lr = lr
     Min_lr = Init_lr * 0.01
     lr_decay_type = 'cos'
     nbs = 16
-    lr_limit_max = 1e-4
-    lr_limit_min = 1e-4
+    lr_limit_max = Init_lr
+    lr_limit_min = Init_lr
 
     Init_lr_fit = min(max(batch_size / nbs * Init_lr, lr_limit_min), lr_limit_max)
     Min_lr_fit = min(max(batch_size / nbs * Min_lr, lr_limit_min * 1e-2), lr_limit_max * 1e-2)
@@ -137,7 +139,7 @@ def train(args):
     
     scaler = torch.amp.GradScaler(device='cuda') if args.amp else None
 
-    optimizer, lr_scheduler_func = get_optimizer_and_lr(model, batch_size, train_epoch, args.momentum, args.weight_decay)
+    optimizer, lr_scheduler_func = get_optimizer_and_lr(model, batch_size, train_epoch, args.momentum, args.weight_decay, lr=args.lr)
 
     start_time = time.time()
 
