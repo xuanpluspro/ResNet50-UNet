@@ -123,18 +123,19 @@ def train(args):
     input_shape = [512, 512]
 
     train_dataset = UnetDataset(args.data_path, input_shape, num_classes, augmentation=True, txt_name="train.txt")
-    val_dataset = UnetDataset(args.data_path, input_shape, num_classes, augmentation=False, txt_name="val.txt")
+    val_dataset = UnetDataset(args.data_path, input_shape, num_classes, augmentation=False, txt_name="val.txt", native_size=True)
 
     train_loader = DataLoader(train_dataset, shuffle=True, batch_size=batch_size, num_workers=num_workers,
                               pin_memory=True, drop_last=False, collate_fn=unet_dataset_collate,
                               worker_init_fn=partial(worker_init_fn, rank=0, seed=11))
 
-    val_loader = DataLoader(val_dataset, shuffle=False, batch_size=batch_size, num_workers=num_workers,
+    val_loader = DataLoader(val_dataset, shuffle=False, batch_size=1, num_workers=num_workers,
                             pin_memory=True, drop_last=False, collate_fn=unet_dataset_collate,
                             worker_init_fn=partial(worker_init_fn, rank=0, seed=11))
 
     model = create_model(num_classes=num_classes, weights=args.weights)
     model.to(device)
+    eval_model = model  # Avoid recompiling for different validation image sizes.
     model = torch.compile(model)
     
     scaler = torch.amp.GradScaler(device='cuda') if args.amp else None
@@ -165,11 +166,11 @@ def train(args):
 
         # ============ 每 5 轮动态搜索一次最优阈值 ============
         if epoch == 0 or (epoch + 1) % 5 == 0:
-            best_threshold_current = search_best_threshold(model, val_loader, device, num_classes)
+            best_threshold_current = search_best_threshold(eval_model, val_loader, device, num_classes)
         # ===================================================
 
         # 使用找到的阈值进行验证评估
-        metrics = evaluate(model, val_loader, device, dice_loss, focal_loss, num_classes, threshold=best_threshold_current)
+        metrics = evaluate(eval_model, val_loader, device, dice_loss, focal_loss, num_classes, threshold=best_threshold_current)
 
         val_losses.append(metrics["Loss"])
         val_metrics_history.append(metrics)
