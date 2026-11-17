@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 
 from model.resnet_backbone import resnet50
 
@@ -31,7 +32,7 @@ class unetUp(nn.Module):
         """
         # 先对 inputs2 进行上采样，然后与 inputs1 在通道维度上进行拼接
         # 拼接后的通道数为 in_size
-        outputs = torch.cat([inputs1, self.up(inputs2)], 1)
+        outputs = torch.cat([inputs1, F.interpolate(inputs2, size=inputs1.shape[-2:], mode='bilinear', align_corners=True)], 1)
         # 第一次卷积 + ReLU
         outputs = self.conv1(outputs)
         outputs = self.relu(outputs)
@@ -96,7 +97,9 @@ class Unet(nn.Module):
 
         # 可选的最终进一步上采样（恢复到输入图尺寸）
         if self.up_conv != None:
-            up1 = self.up_conv(up1)
+            up1 = F.interpolate(up1, size=inputs.shape[-2:], mode='bilinear', align_corners=True)
+            for i in range(1, len(self.up_conv)):
+                up1 = self.up_conv[i](up1)
 
         # 最终生成每类的预测图
         final = self.final(up1)
