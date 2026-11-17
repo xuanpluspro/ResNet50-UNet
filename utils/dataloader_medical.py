@@ -1,4 +1,5 @@
 import os
+from pathlib import Path
 
 import cv2
 import numpy as np
@@ -14,8 +15,8 @@ class UnetDataset(Dataset):
         super(UnetDataset, self).__init__()
 
         # 读取train.txt和val.txt,test.txt文件，获取训练和验证集的图像ID
-        with open(os.path.join(data_path, "ImageSets/Segmentation", txt_name), "r") as f:
-            self.annotation_lines = f.readlines()
+        with open(os.path.join(data_path, "ImageSets/Segmentation", txt_name), "r", encoding="utf-8-sig") as f:
+            self.annotation_lines = [line.strip() for line in f if line.strip()]
 
         # 初始化其他参数
         self.length = len(self.annotation_lines)  # 数据集的长度
@@ -31,21 +32,21 @@ class UnetDataset(Dataset):
     def __getitem__(self, index):
         # 读取单个样本
         annotation_line = self.annotation_lines[index]  # 获取对应的annotation
-        name = annotation_line.split()[0]  # 获取文件名，通常是图像文件的名称
-
-        #   从文件中读取图像
-        
-        img_dir = os.path.join(self.data_path, "JPEGImages")
-        jpg_path = os.path.join(img_dir, name + ".jpg")
-        png_path = os.path.join(img_dir, name + ".png")
-        
-        # 判断原图格式：如果存在 .jpg 文件则读取 .jpg，否则读取 .png
-        if os.path.exists(jpg_path):
-            jpg = Image.open(jpg_path)
-        else:
-            jpg = Image.open(png_path)
-        
-        png = Image.open(os.path.join(os.path.join(self.data_path, "SegmentationClass"), name + ".png"))
+        name = annotation_line
+        root = Path(self.data_path) / ""
+        images = root / "JPEGImages"
+        candidates = [images / (name + ext)
+                      for ext in (".jpg", ".png", ".jpeg", ".JPG", ".PNG", ".JPEG")]
+        image_path = next((path for path in candidates if path.is_file()), None)
+        if image_path is None:
+            raise FileNotFoundError(f"找不到样本 {name!r} 的 JPG/JPEG/PNG：{images}")
+        mask_path = root / "SegmentationClass" / (name + ".png")
+        with Image.open(image_path) as image:
+            jpg = image.copy()
+        with Image.open(mask_path) as mask:
+            png = mask.copy()  # 保留调色板类别索引
+        if jpg.size != png.size:
+            raise ValueError(f"图像与掩膜尺寸不同：{name}: {jpg.size} / {png.size}")
 
         # 如果是训练阶段，进行随机数据增强
         jpg, png = self.get_random_data(jpg, png, self.input_shape, random=self.augmentation)
