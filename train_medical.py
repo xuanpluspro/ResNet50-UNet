@@ -123,7 +123,7 @@ def train(args):
     input_shape = [512, 512]
 
     train_dataset = UnetDataset(args.data_path, input_shape, num_classes, augmentation=True, txt_name="train.txt")
-    val_dataset = UnetDataset(args.data_path, input_shape, num_classes, augmentation=True, txt_name="val.txt")
+    val_dataset = UnetDataset(args.data_path, input_shape, num_classes, augmentation=False, txt_name="val.txt")
 
     train_loader = DataLoader(train_dataset, shuffle=True, batch_size=batch_size, num_workers=num_workers,
                               pin_memory=True, drop_last=False, collate_fn=unet_dataset_collate,
