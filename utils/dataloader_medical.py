@@ -11,7 +11,7 @@ from utils.utils import cvtColor, preprocess_input
 
 
 class UnetDataset(Dataset):
-    def __init__(self, data_path, input_shape, num_classes, augmentation=True, txt_name: str = "train.txt"):
+    def __init__(self, data_path, input_shape, num_classes, augmentation=True, txt_name: str = "train.txt", native_size=False):
         super(UnetDataset, self).__init__()
 
         # 读取train.txt和val.txt,test.txt文件，获取训练和验证集的图像ID
@@ -23,6 +23,9 @@ class UnetDataset(Dataset):
         self.input_shape = input_shape  # 输入图像的形状（宽和高）
         self.num_classes = num_classes  # 类别数目
         self.augmentation = augmentation  # 是否在训练阶段，用来控制是否使用数据增强
+        self.native_size = native_size
+        if native_size and augmentation:
+            raise ValueError('native_size cannot be combined with random augmentation')
         self.data_path = data_path  # 数据集路径
 
     def __len__(self):
@@ -49,10 +52,13 @@ class UnetDataset(Dataset):
             raise ValueError(f"图像与掩膜尺寸不同：{name}: {jpg.size} / {png.size}")
 
         # 如果是训练阶段，进行随机数据增强
-        jpg, png = self.get_random_data(jpg, png, self.input_shape, random=self.augmentation)
+        if self.native_size:
+            jpg = cvtColor(jpg)
+        else:
+            jpg, png = self.get_random_data(jpg, png, self.input_shape, random=self.augmentation)
 
         # 图像预处理
-        jpg = np.transpose(preprocess_input(np.array(jpg, np.float64)), [2, 0, 1])
+        jpg = np.transpose(preprocess_input(np.array(jpg, np.float32)), [2, 0, 1])
         # 标签转换成numpy数组
         png = np.array(png)
 
@@ -63,8 +69,8 @@ class UnetDataset(Dataset):
         modify_png = np.zeros_like(png)
         modify_png[png >= 127.5] = 1
         seg_labels = modify_png
-        seg_labels = np.eye(self.num_classes + 1)[seg_labels.reshape([-1])]
-        seg_labels = seg_labels.reshape((int(self.input_shape[0]), int(self.input_shape[1]), self.num_classes + 1))
+        seg_labels = np.eye(self.num_classes + 1, dtype=np.float32)[seg_labels.reshape([-1])]
+        seg_labels = seg_labels.reshape((*modify_png.shape, self.num_classes + 1))
 
         return jpg, modify_png, seg_labels
 
